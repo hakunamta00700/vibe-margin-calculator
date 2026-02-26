@@ -45,22 +45,7 @@
     </div>
   </div>
 
-  <div class="card">
-    <h3 style="margin-top:0">재료 DB 관리 (쿠팡 링크 포함)</h3>
-    <div class="inline">
-      <div><label>재료명</label><input id="mName" placeholder="예: 앵커버터 무염" /></div>
-      <div><label>구매가(원)</label><input id="mPrice" type="text" inputmode="numeric" placeholder="13,500" /></div>
-      <div><label>총중량(g)</label><input id="mWeight" type="number" min="1" placeholder="450" /></div>
-      <div><label>쿠팡 파트너스 링크</label><input id="mLink" placeholder="https://link.coupang.com/..." /></div>
-      <button class="primary" id="addMaterialBtn">재료 추가</button>
-    </div>
-    <div style="margin-top:10px;overflow:auto;">
-      <table>
-        <thead><tr><th>재료명</th><th class="num">구매가</th><th class="num">총중량(g)</th><th class="num">원/g</th><th>링크</th><th>삭제</th></tr></thead>
-        <tbody id="materialRows"></tbody>
-      </table>
-    </div>
-  </div>
+  <!-- 재료 DB 관리는 하단 접기 섹션에서 제공 -->
 
   <div class="card">
     <div class="inline">
@@ -80,11 +65,12 @@
     <table>
       <thead>
         <tr>
-          <th style="width:24%">재료 선택(검색)</th>
-          <th style="width:12%" class="num">원/g</th>
-          <th style="width:12%">사용량(g)</th>
+          <th style="width:22%">재료 선택(검색)</th>
+          <th style="width:10%" class="num">DB 원/g</th>
+          <th style="width:12%">직접단가(원/g)</th>
+          <th style="width:10%">사용량(g)</th>
           <th style="width:12%" class="num">투입원가</th>
-          <th style="width:30%">쿠팡링크</th>
+          <th style="width:24%">쿠팡링크</th>
           <th style="width:10%">삭제</th>
         </tr>
       </thead>
@@ -108,6 +94,24 @@
     <div><label>목표이익(원)</label><input id="targetProfit" type="text" inputmode="numeric" value="100,000" /></div>
     <button class="sub" id="applyTargetBtn">목표가로 판매가 적용</button>
   </div>
+
+  <details class="card" id="materialAdminSection">
+    <summary style="cursor:pointer;font-weight:600;">재료 DB 관리 열기 (관리자용)</summary>
+    <p class="muted" style="margin-top:8px;">소비자는 계산기만 사용하고, 재료 DB 관리는 필요할 때만 열어 수정합니다.</p>
+    <div class="inline">
+      <div><label>재료명</label><input id="mName" placeholder="예: 앵커버터 무염" /></div>
+      <div><label>구매가(원)</label><input id="mPrice" type="text" inputmode="numeric" placeholder="13,500" /></div>
+      <div><label>총중량(g)</label><input id="mWeight" type="number" min="1" placeholder="450" /></div>
+      <div><label>쿠팡 파트너스 링크</label><input id="mLink" placeholder="https://link.coupang.com/..." /></div>
+      <button class="primary" id="addMaterialBtn">재료 추가</button>
+    </div>
+    <div style="margin-top:10px;overflow:auto;">
+      <table>
+        <thead><tr><th>재료명</th><th class="num">구매가</th><th class="num">총중량(g)</th><th class="num">원/g</th><th>링크</th><th>삭제</th></tr></thead>
+        <tbody id="materialRows"></tbody>
+      </table>
+    </div>
+  </details>
 
   <div class="card footer-actions">
     <button class="primary" id="copySummaryBtn">요약 복사</button>
@@ -201,8 +205,9 @@ function refreshMaterialDatalist(){
 
 function rowHtml(){
   return `<tr>
-    <td><input class="matName" list="materialList" placeholder="재료명 검색/선택"></td>
+    <td><input class="matName" list="materialList" placeholder="재료명 검색/선택 또는 직접입력"></td>
     <td class="num unitCost">0.00</td>
+    <td><input class="customUnitPrice" type="text" inputmode="decimal" placeholder="DB 없으면 입력" disabled></td>
     <td><input class="usedG" type="number" min="0" step="0.01" value="0"></td>
     <td class="num subCost">0</td>
     <td>
@@ -220,11 +225,19 @@ function addRecipeRow(data){
   if(data){
     tr.querySelector('.matName').value = data.materialName || '';
     tr.querySelector('.usedG').value = data.amount || 0;
+    tr.querySelector('.customUnitPrice').value = data.customUnitPrice ?? '';
   }
 
   tr.querySelector('.matName').addEventListener('change', ()=> syncRowMaterial(tr));
   tr.querySelector('.matName').addEventListener('blur', ()=> syncRowMaterial(tr));
   tr.querySelector('.usedG').addEventListener('input', calc);
+  tr.querySelector('.customUnitPrice').addEventListener('input', calc);
+  tr.querySelector('.customUnitPrice').addEventListener('blur', ()=> {
+    const el = tr.querySelector('.customUnitPrice');
+    const n = parseMoney(el.value);
+    el.value = n ? n.toFixed(2) : '';
+    calc();
+  });
   tr.querySelector('.delRow').onclick = ()=> { tr.remove(); calc(); };
 
   syncRowMaterial(tr);
@@ -234,14 +247,20 @@ function syncRowMaterial(tr){
   const name = tr.querySelector('.matName').value.trim();
   const mat = getMaterials().find(m => m.name === name);
   const a = tr.querySelector('.buy');
+  const custom = tr.querySelector('.customUnitPrice');
   if(mat){
     tr.querySelector('.matId').value = mat.id;
     tr.querySelector('.unitCost').textContent = pricePerGram(mat).toFixed(2);
+    custom.value = '';
+    custom.disabled = true;
+    custom.placeholder = 'DB 단가 자동사용';
     a.href = mat.coupangLink || '#';
     a.textContent = mat.coupangLink ? '구매링크 열기' : '구매링크 없음';
   } else {
     tr.querySelector('.matId').value = '';
     tr.querySelector('.unitCost').textContent = '0.00';
+    custom.disabled = false;
+    custom.placeholder = '직접단가 입력';
     a.removeAttribute('href');
     a.textContent = '구매링크 없음';
   }
@@ -253,7 +272,8 @@ function getRecipeRows(){
     const materialId = tr.querySelector('.matId').value;
     const materialName = tr.querySelector('.matName').value.trim();
     const amount = Number(tr.querySelector('.usedG').value || 0);
-    return { materialId, materialName, amount };
+    const customUnitPrice = parseMoney(tr.querySelector('.customUnitPrice').value || 0);
+    return { materialId, materialName, amount, customUnitPrice };
   }).filter(x => x.materialName && x.amount > 0);
 }
 
@@ -265,9 +285,10 @@ function calc(){
     const matId = tr.querySelector('.matId').value;
     const used = Number(tr.querySelector('.usedG').value || 0);
     const m = materials.find(x => x.id === matId);
-    const unit = m ? pricePerGram(m) : 0;
+    const customUnit = parseMoney(tr.querySelector('.customUnitPrice').value || 0);
+    const unit = m ? pricePerGram(m) : customUnit;
     const sub = unit * used;
-    tr.querySelector('.unitCost').textContent = unit.toFixed(2);
+    tr.querySelector('.unitCost').textContent = m ? unit.toFixed(2) : '직접';
     tr.querySelector('.subCost').textContent = nf(sub);
     matTotal += sub;
   });
