@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>베이커리 원가·마진 계산기 v3</title>
+  <style>
+    body { font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; max-width:1100px; margin:24px auto; padding:0 16px; background:#f6f7fb; }
+    h1 { margin:0 0 8px; font-size:24px; }
+    .muted { color:#666; font-size:13px; }
+    .disclosure { background:#fff3cd; border:1px solid #ffe69c; color:#5c4700; border-radius:10px; padding:10px 12px; margin:10px 0 14px; font-size:13px; }
+    .card { background:#fff; border-radius:14px; padding:14px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:14px; }
+    .grid { display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px; }
+    label { font-size:12px; color:#444; display:block; margin-bottom:4px; }
+    input, select { width:100%; padding:9px 10px; border:1px solid #d8d8de; border-radius:10px; font-size:14px; box-sizing:border-box; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom:1px solid #efeff4; padding:8px; text-align:left; font-size:14px; vertical-align:middle; }
+    th { background:#fafafe; }
+    .num { text-align:right; }
+    button { border:none; border-radius:10px; padding:8px 12px; cursor:pointer; }
+    .primary { background:#111; color:#fff; }
+    .sub { background:#f0f1f6; color:#333; }
+    .danger { background:#ffe9eb; color:#a40016; }
+    .kpis { display:grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap:10px; }
+    .kpi { background:#fafafe; border:1px solid #ececf4; border-radius:10px; padding:10px; }
+    .kpi b { display:block; margin-top:5px; font-size:20px; }
+    .footer-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    a.buy { color:#0b57d0; text-decoration:none; font-size:13px; }
+    .inline { display:flex; gap:8px; align-items:end; flex-wrap:wrap; }
+    .inline > div { flex:1 1 180px; }
+    @media (max-width:900px){ .grid{grid-template-columns:1fr 1fr;} .kpis{grid-template-columns:1fr;} }
+  </style>
+</head>
+<body>
+  <h1>베이커리 원가·마진 계산기 v3</h1>
+  <p class="muted">재료별 원가 + 쿠팡 링크 + 레시피 저장/불러오기 + 손익분기점 + 목표이익 역산</p>
+  <div class="disclosure">[광고] 이 페이지는 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받을 수 있도록 제작되었습니다.</div>
+
+  <div class="card">
+    <div class="grid">
+      <div><label>제품명</label><input id="productName" value="소금빵" /></div>
+      <div><label>생산수량(개)</label><input id="qty" type="number" value="200" min="1" /></div>
+      <div><label>판매가(개당, 원)</label><input id="sellPrice" type="number" value="2500" min="0" /></div>
+      <div><label>기타비(인건비+고정비, 원)</label><input id="etcCost" type="number" value="130000" min="0" /></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="inline">
+      <div>
+        <label>레시피 이름</label>
+        <input id="recipeName" placeholder="예: 소금빵 기본" />
+      </div>
+      <div>
+        <label>저장된 레시피</label>
+        <select id="recipeSelect"><option value="">선택</option></select>
+      </div>
+      <button class="sub" id="saveRecipeBtn">레시피 저장</button>
+      <button class="sub" id="loadRecipeBtn">불러오기</button>
+      <button class="danger" id="deleteRecipeBtn">삭제</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+      <h3 style="margin:0;">재료별 입력</h3>
+      <button class="sub" id="addRowBtn">+ 재료 추가</button>
+    </div>
+    <table>
+      <thead>
+      <tr>
+        <th style="width:20%;">재료명</th>
+        <th style="width:12%;">수량</th>
+        <th style="width:12%;">단위</th>
+        <th style="width:14%;" class="num">단가(원)</th>
+        <th style="width:14%;" class="num">소계(원)</th>
+        <th style="width:20%;">쿠팡링크</th>
+        <th style="width:8%;">삭제</th>
+      </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+
+  <div class="card kpis">
+    <div class="kpi"><span>재료비 합계</span><b id="matTotal">0원</b></div>
+    <div class="kpi"><span>총원가</span><b id="totalCost">0원</b></div>
+    <div class="kpi"><span>개당원가</span><b id="unitCost">0원</b></div>
+    <div class="kpi"><span>개당이익</span><b id="unitProfit">0원</b></div>
+    <div class="kpi"><span>마진율(원가기준)</span><b id="margin">0%</b></div>
+    <div class="kpi"><span>이익률(매출기준)</span><b id="profitRate">0%</b></div>
+    <div class="kpi"><span>손익분기점 수량(개)</span><b id="breakevenQty">0</b></div>
+    <div class="kpi"><span>목표이익(원)</span><b id="targetProfitShow">100,000원</b></div>
+    <div class="kpi"><span>목표이익 달성 필요 판매가(개당)</span><b id="targetPrice">0원</b></div>
+  </div>
+
+  <div class="card inline">
+    <div><label>목표이익(원)</label><input id="targetProfit" type="number" value="100000" min="0" /></div>
+    <button class="sub" id="applyTargetBtn">목표가로 판매가 적용</button>
+  </div>
+
+  <div class="card footer-actions">
+    <button class="primary" id="copySummaryBtn">요약 복사</button>
+    <button class="sub" id="copyRowsBtn">재료표 CSV 복사</button>
+    <span id="toast" class="muted"></span>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const nf = n => new Intl.NumberFormat('ko-KR').format(Math.round(n||0));
+const pct = n => isFinite(n) ? (n*100).toFixed(1)+'%' : '0%';
+const KEY = 'bakery_margin_calc_v3_recipes';
+
+const sampleRows = [
+  { name:'밀가루', qty:3000, unit:'g', unitPrice:2.4, link:'https://link.coupang.com/' },
+  { name:'버터', qty:1200, unit:'g', unitPrice:9.5, link:'https://link.coupang.com/' },
+  { name:'소금', qty:80, unit:'g', unitPrice:1.2, link:'https://link.coupang.com/' },
+  { name:'이스트', qty:60, unit:'g', unitPrice:7.0, link:'https://link.coupang.com/' }
+];
+
+function rowHtml(r={name:'',qty:'',unit:'g',unitPrice:'',link:''}){
+return `<tr>
+<td><input class="name" value="${r.name}"></td>
+<td><input class="qty" type="number" min="0" step="0.01" value="${r.qty}"></td>
+<td><input class="unit" value="${r.unit}"></td>
+<td><input class="unitPrice" type="number" min="0" step="0.01" value="${r.unitPrice}"></td>
+<td class="num subtotal">0</td>
+<td><input class="link" placeholder="https://link.coupang.com/..." value="${r.link}"><div style="margin-top:4px;"><a class="buy" target="_blank" rel="nofollow noopener">구매링크 열기</a></div></td>
+<td><button class="danger del">삭제</button></td>
+</tr>`;
+}
+
+function addRow(data){ $('rows').insertAdjacentHTML('beforeend', rowHtml(data)); bindRowEvents(); calc(); }
+
+function bindRowEvents(){
+  document.querySelectorAll('#rows tr').forEach(tr=>{
+    tr.querySelectorAll('input').forEach(inp=>inp.oninput=calc);
+    tr.querySelector('.del').onclick = ()=>{ tr.remove(); calc(); };
+  });
+}
+
+function vNum(id){ return Number($(id).value||0); }
+
+function getRows(){
+  return [...document.querySelectorAll('#rows tr')].map(tr=>(
+    {
+      name: tr.querySelector('.name').value.trim(),
+      qty: Number(tr.querySelector('.qty').value||0),
+      unit: tr.querySelector('.unit').value.trim(),
+      unitPrice: Number(tr.querySelector('.unitPrice').value||0),
+      link: tr.querySelector('.link').value.trim()
+    }
+  ));
+}
+
+function calc(){
+  let matTotal=0;
+  document.querySelectorAll('#rows tr').forEach(tr=>{
+    const q = Number(tr.querySelector('.qty').value||0);
+    const p = Number(tr.querySelector('.unitPrice').value||0);
+    const sub = q*p;
+    tr.querySelector('.subtotal').textContent = nf(sub);
+    matTotal += sub;
+
+    const link = tr.querySelector('.link').value.trim();
+    const a = tr.querySelector('a.buy');
+    a.href = link || 'javascript:void(0)';
+    a.textContent = link ? '구매링크 열기' : '링크 입력 필요';
+  });
+
+  const qty = Math.max(vNum('qty'),1);
+  const sell = vNum('sellPrice');
+  const etc = vNum('etcCost');
+  const totalCost = matTotal + etc;
+  const unitCost = totalCost/qty;
+  const unitProfit = sell-unitCost;
+  const margin = unitProfit/Math.max(unitCost,1);
+  const profitRate = unitProfit/Math.max(sell,1);
+
+  // 손익분기점: 기타비 / (판매가 - 재료변동비/개)
+  const variablePerUnit = matTotal/qty;
+  const contrib = sell - variablePerUnit;
+  const breakevenQty = contrib>0 ? Math.ceil(etc/contrib) : Infinity;
+
+  const targetProfit = Math.max(vNum('targetProfit'),0);
+  const targetPrice = (totalCost + targetProfit) / qty;
+
+  $('matTotal').textContent = nf(matTotal)+'원';
+  $('totalCost').textContent = nf(totalCost)+'원';
+  $('unitCost').textContent = nf(unitCost)+'원';
+  $('unitProfit').textContent = nf(unitProfit)+'원';
+  $('margin').textContent = pct(margin);
+  $('profitRate').textContent = pct(profitRate);
+  $('breakevenQty').textContent = isFinite(breakevenQty) ? nf(breakevenQty) : '계산불가';
+  $('targetProfitShow').textContent = nf(targetProfit)+'원';
+  $('targetPrice').textContent = nf(targetPrice)+'원';
+}
+
+function toast(msg){ $('toast').textContent=msg; setTimeout(()=>$('toast').textContent='',2000); }
+
+function copyText(text, msg){ navigator.clipboard.writeText(text).then(()=>toast(msg)).catch(()=>toast('복사 실패')); }
+
+$('copySummaryBtn').onclick = ()=>{
+  const text = [
+    `제품명: ${$('productName').value}`,
+    `재료비 합계: ${$('matTotal').textContent}`,
+    `총원가: ${$('totalCost').textContent}`,
+    `개당원가: ${$('unitCost').textContent}`,
+    `개당이익: ${$('unitProfit').textContent}`,
+    `마진율(원가기준): ${$('margin').textContent}`,
+    `이익률(매출기준): ${$('profitRate').textContent}`,
+    `손익분기점 수량: ${$('breakevenQty').textContent}개`,
+    `목표이익 달성 필요 판매가: ${$('targetPrice').textContent}`
+  ].join('\n');
+  copyText(text,'요약 복사 완료');
+};
+
+$('copyRowsBtn').onclick = ()=>{
+  const header = '재료명,수량,단위,단가(원),소계(원),쿠팡링크';
+  const rows = [...document.querySelectorAll('#rows tr')].map(tr=>{
+    const name=tr.querySelector('.name').value.replaceAll(',',' ');
+    const qty=tr.querySelector('.qty').value;
+    const unit=tr.querySelector('.unit').value.replaceAll(',',' ');
+    const price=tr.querySelector('.unitPrice').value;
+    const sub=tr.querySelector('.subtotal').textContent.replaceAll(',','');
+    const link=tr.querySelector('.link').value.replaceAll(',',' ');
+    return `${name},${qty},${unit},${price},${sub},${link}`;
+  });
+  copyText([header,...rows].join('\n'),'재료표 CSV 복사 완료');
+};
+
+$('applyTargetBtn').onclick = ()=>{
+  const value = Number(($('targetPrice').textContent||'0').replace(/[^0-9.-]/g,''));
+  if(value>0){ $('sellPrice').value = Math.round(value); calc(); toast('판매가에 목표가 반영'); }
+};
+
+$('addRowBtn').onclick = ()=>addRow();
+['qty','sellPrice','etcCost','targetProfit','productName'].forEach(id=>$(id).oninput=calc);
+
+function loadRecipes(){
+  const data = JSON.parse(localStorage.getItem(KEY)||'{}');
+  $('recipeSelect').innerHTML = '<option value="">선택</option>' + Object.keys(data).map(k=>`<option value="${k}">${k}</option>`).join('');
+}
+
+function saveCurrentRecipe(){
+  const name = $('recipeName').value.trim();
+  if(!name){ toast('레시피 이름 입력'); return; }
+  const data = JSON.parse(localStorage.getItem(KEY)||'{}');
+  data[name] = {
+    productName: $('productName').value,
+    qty: $('qty').value,
+    sellPrice: $('sellPrice').value,
+    etcCost: $('etcCost').value,
+    targetProfit: $('targetProfit').value,
+    rows: getRows()
+  };
+  localStorage.setItem(KEY, JSON.stringify(data));
+  loadRecipes();
+  $('recipeSelect').value = name;
+  toast('레시피 저장 완료');
+}
+
+function loadSelectedRecipe(){
+  const key = $('recipeSelect').value;
+  if(!key){ toast('레시피 선택'); return; }
+  const data = JSON.parse(localStorage.getItem(KEY)||'{}')[key];
+  if(!data){ toast('레시피 없음'); return; }
+  $('productName').value = data.productName || '';
+  $('qty').value = data.qty || 1;
+  $('sellPrice').value = data.sellPrice || 0;
+  $('etcCost').value = data.etcCost || 0;
+  $('targetProfit').value = data.targetProfit || 0;
+  $('rows').innerHTML='';
+  (data.rows||[]).forEach(addRow);
+  calc();
+  toast('레시피 불러오기 완료');
+}
+
+function deleteSelectedRecipe(){
+  const key = $('recipeSelect').value;
+  if(!key){ toast('레시피 선택'); return; }
+  const data = JSON.parse(localStorage.getItem(KEY)||'{}');
+  delete data[key];
+  localStorage.setItem(KEY, JSON.stringify(data));
+  loadRecipes();
+  toast('레시피 삭제 완료');
+}
+
+$('saveRecipeBtn').onclick = saveCurrentRecipe;
+$('loadRecipeBtn').onclick = loadSelectedRecipe;
+$('deleteRecipeBtn').onclick = deleteSelectedRecipe;
+
+sampleRows.forEach(addRow);
+loadRecipes();
+calc();
+</script>
+</body>
+</html>
