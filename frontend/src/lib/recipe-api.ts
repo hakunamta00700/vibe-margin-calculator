@@ -1,9 +1,7 @@
 "use client";
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(
-  /\/$/,
-  "",
-);
+const DEFAULT_API_BASE_URL = "http://localhost:8000";
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const AUTH_STORAGE_KEY = "vibe_recipe_access_token";
 const AUTH_EVENT = "vibe_recipe_auth_change";
 
@@ -128,6 +126,32 @@ type MaterialQueryParams = {
   offset?: number;
 };
 
+function getApiBaseUrl(): string {
+  const configuredBaseUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL).replace(
+    /\/$/,
+    "",
+  );
+
+  if (typeof window === "undefined") {
+    return configuredBaseUrl;
+  }
+
+  try {
+    const resolvedUrl = new URL(configuredBaseUrl, window.location.origin);
+    if (
+      LOOPBACK_HOSTS.has(resolvedUrl.hostname) &&
+      LOOPBACK_HOSTS.has(window.location.hostname) &&
+      resolvedUrl.hostname !== window.location.hostname
+    ) {
+      resolvedUrl.hostname = window.location.hostname;
+      resolvedUrl.protocol = window.location.protocol;
+    }
+    return resolvedUrl.toString().replace(/\/$/, "");
+  } catch {
+    return configuredBaseUrl;
+  }
+}
+
 export function getAuthToken(): string | null {
   if (typeof window === "undefined") {
     return null;
@@ -188,7 +212,7 @@ export function getAssetUrl(path: string | null): string | null {
   if (path.startsWith("http://") || path.startsWith("https://")) {
     return path;
   }
-  return `${API_BASE_URL}${path}`;
+  return `${getApiBaseUrl()}${path}`;
 }
 
 function buildQueryString(
@@ -236,7 +260,7 @@ async function request<T>(
     }
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
     ...init,
     headers,
   });
@@ -245,17 +269,25 @@ async function request<T>(
 }
 
 export async function signIn(email: string, password: string): Promise<AuthResponse> {
-  return request<AuthResponse>("/api/auth/sign-in", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
+  return request<AuthResponse>(
+    "/api/auth/sign-in",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    },
+    { withAuth: false },
+  );
 }
 
 export async function signUp(email: string, password: string): Promise<AuthResponse> {
-  return request<AuthResponse>("/api/auth/sign-up", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
+  return request<AuthResponse>(
+    "/api/auth/sign-up",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    },
+    { withAuth: false },
+  );
 }
 
 export async function signOut(): Promise<{ success: boolean }> {
@@ -263,10 +295,14 @@ export async function signOut(): Promise<{ success: boolean }> {
 }
 
 export async function resetPassword(email: string): Promise<{ success: boolean }> {
-  return request<{ success: boolean }>("/api/auth/reset-password", {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  });
+  return request<{ success: boolean }>(
+    "/api/auth/reset-password",
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+    { withAuth: false },
+  );
 }
 
 export async function listPublicRecipes(
