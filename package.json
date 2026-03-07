@@ -1,28 +1,20 @@
-{
+﻿{
   "name": "vibe-margin-calculator",
   "private": true,
   "version": "0.1.0",
-  "description": "Recipe manager with Next.js and Supabase",
+  "description": "Repo entrypoint for the recipe manager services",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc -p tsconfig.json"
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:admin-frontend": "npm --prefix admin_frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:admin-frontend": "npm --prefix admin_frontend run build",
+    "start:frontend": "npm --prefix frontend run start",
+    "start:admin-frontend": "npm --prefix admin_frontend run start",
+    "lint:frontend": "npm --prefix frontend run lint",
+    "lint:admin-frontend": "npm --prefix admin_frontend run lint",
+    "typecheck:frontend": "npm --prefix frontend run typecheck",
+    "typecheck:admin-frontend": "npm --prefix admin_frontend run typecheck"
   },
-  "dependencies": {
-    "next": "^14.2.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "@supabase/supabase-js": "^2.45.0",
-    "@supabase/ssr": "^0.5.6"
-  },
-  "devDependencies": {
-    "typescript": "^5.5.4",
-    "@types/node": "^20.14.10",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.5"
-  }
+  "dependencies": {},
+  "devDependencies": {}
 }
