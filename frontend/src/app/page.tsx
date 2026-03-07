@@ -1,112 +1,77 @@
 "use client";
 
-import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
-import { listPublicRecipes, Recipe } from "@/lib/recipe-api";
+import { CalculatorIcon, FolderKanbanIcon } from "lucide-react";
+import { CostCalculator } from "@/components/cost-calculator";
+import { PublicRecipeBrowser } from "@/components/public-recipe-browser";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-type SortOrder = "created_at" | "updated_at" | "title";
-type Direction = "asc" | "desc";
 
 export default function HomePage() {
-  const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
-  const [sort, setSort] = useState<SortOrder>("created_at");
-  const [order, setOrder] = useState<Direction>("desc");
-
-  const load = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await listPublicRecipes({
-        q: query || undefined,
-        category: category || undefined,
-        sort,
-        order,
-        limit: 20,
-      });
-      setRecipes(data);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void load();
-  }, []);
-
-  const uniqueCategories = useMemo(() => {
-    const values = new Set<string>();
-    recipes.forEach((recipe) => {
-      if (recipe.category) {
-        values.add(recipe.category);
-      }
-    });
-    return Array.from(values).sort();
-  }, [recipes]);
-
-  const onSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    await load();
-  };
-
   return (
-    <section>
-      <h1>공개 레시피</h1>
-      <form className="card toolbar" onSubmit={onSubmit}>
-        <label>
-          키워드
-          <input value={query} onChange={(event) => setQuery(event.target.value)} />
-        </label>
-        <label>
-          카테고리
-          <input value={category} onChange={(event) => setCategory(event.target.value)} />
-        </label>
-        <label>
-          정렬
-          <select value={sort} onChange={(event) => setSort(event.target.value as SortOrder)}>
-            <option value="created_at">최신 등록순</option>
-            <option value="updated_at">최근 수정순</option>
-            <option value="title">이름순</option>
-          </select>
-        </label>
-        <label>
-          방향
-          <select value={order} onChange={(event) => setOrder(event.target.value as Direction)}>
-            <option value="desc">내림차순</option>
-            <option value="asc">오름차순</option>
-          </select>
-        </label>
-        <button type="submit" disabled={loading}>
-          {loading ? "조회 중" : "적용"}
-        </button>
-      </form>
+    <section className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="border-white/70 bg-white/86 shadow-2xl shadow-orange-950/5 backdrop-blur">
+          <CardContent className="flex h-full flex-col justify-between gap-6 px-6 py-6 sm:px-8 sm:py-8">
+            <div className="space-y-4">
+              <Badge variant="secondary" className="w-fit rounded-full px-3">
+                Bakery Margin
+              </Badge>
+              <div className="space-y-3">
+                <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+                  초기 커밋의 원가 계산 흐름을 현재 백엔드와 관리자 구조로 다시 연결했습니다.
+                </h1>
+                <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+                  기본 재료 DB는 서버에서 자동 시드되고, 계산 레시피는 브라우저에 빠르게 저장됩니다.
+                  공개 레시피 탐색은 그대로 유지해 메뉴 참고와 원가 계산을 한 화면에서 오갈 수 있게
+                  정리했습니다.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
-      {!loading && recipes.length === 0 && (
-        <p>공개 레시피가 없습니다. 로그인 후 직접 레시피를 등록해 보세요.</p>
-      )}
-
-      <div>
-        {uniqueCategories.length > 0 && (
-          <p>카테고리 샘플: {uniqueCategories.join(", ") || "없음"}</p>
-        )}
-        {recipes.map((recipe) => (
-          <article key={recipe.id} className="list-item card">
-            <h3>
-              <Link href={`/recipes/${recipe.id}`}>{recipe.title}</Link>
-            </h3>
-            <p>{recipe.description || "설명 없음"}</p>
-            <small>
-              수정: {new Date(recipe.updated_at).toLocaleString()} / {recipe.category || "카테고리 없음"}
-            </small>
-          </article>
-        ))}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+          <Card className="border-white/70 bg-white/80 shadow-lg shadow-orange-950/5 backdrop-blur">
+            <CardContent className="space-y-3 px-6 py-5">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                <CalculatorIcon className="size-4" />
+                계산기
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">
+                재료별 단가, 기타 비용, 목표 이익을 기준으로 개당 원가와 목표 판매가를 즉시 계산합니다.
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-white/70 bg-white/80 shadow-lg shadow-orange-950/5 backdrop-blur">
+            <CardContent className="space-y-3 px-6 py-5">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-900">
+                <FolderKanbanIcon className="size-4" />
+                공개 아카이브
+              </div>
+              <p className="text-sm leading-6 text-muted-foreground">
+                기존 공개 레시피 탐색과 개인 작업실 흐름도 그대로 함께 둘 수 있습니다.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      <Tabs defaultValue="calculator" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="calculator">원가 계산</TabsTrigger>
+          <TabsTrigger value="archive">공개 레시피</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calculator" className="space-y-6">
+          <CostCalculator />
+        </TabsContent>
+
+        <TabsContent value="archive" className="space-y-6">
+          <PublicRecipeBrowser />
+        </TabsContent>
+      </Tabs>
     </section>
   );
 }

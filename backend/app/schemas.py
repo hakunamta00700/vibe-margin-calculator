@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -8,10 +8,17 @@ class AuthPayload(BaseModel):
     password: str = Field(min_length=8)
 
 
+class UserResponse(BaseModel):
+    id: int
+    email: EmailStr
+    role: Literal["user", "admin"]
+    created_at: Optional[str] = None
+
+
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str
-    user: Dict[str, Any] | None = None
+    user: UserResponse | None = None
 
 
 class RecipeCreatePayload(BaseModel):
@@ -58,6 +65,10 @@ class PasswordResetPayload(BaseModel):
     email: EmailStr
 
 
+class AdminRoleUpdatePayload(BaseModel):
+    role: Literal["user", "admin"]
+
+
 class RecipeResponse(BaseModel):
     id: int
     user_id: int
@@ -76,3 +87,44 @@ class RecipeResponse(BaseModel):
     nutrition: Optional[Dict[str, Any]] = None
     created_at: str
     updated_at: str
+
+
+class MaterialCreatePayload(BaseModel):
+    name: str = Field(min_length=1)
+    price: int = Field(ge=0)
+    weight_g: int = Field(gt=0)
+    coupang_link: Optional[str] = None
+    source_keyword: Optional[str] = None
+    product_id: Optional[str] = None
+
+
+class MaterialPatchPayload(BaseModel):
+    name: Optional[str] = None
+    price: Optional[int] = Field(default=None, ge=0)
+    weight_g: Optional[int] = Field(default=None, gt=0)
+    coupang_link: Optional[str] = None
+    source_keyword: Optional[str] = None
+    product_id: Optional[str] = None
+
+
+class MaterialResponse(BaseModel):
+    id: int
+    name: str
+    price: int
+    weight_g: int
+    price_per_g: float
+    coupang_link: Optional[str] = None
+    source_keyword: Optional[str] = None
+    product_id: Optional[str] = None
+    seed_sources: List[str] = Field(default_factory=list)
+    is_manual: bool = False
+    created_at: str
+    updated_at: str
+
+
+class SeedSyncResponse(BaseModel):
+    processed: int
+    created: int
+    updated: int
+    skipped: int
+    sources: List[str] = Field(default_factory=list)
