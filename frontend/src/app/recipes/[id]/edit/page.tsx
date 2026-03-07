@@ -1,20 +1,22 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { getCurrentUserIdFromToken, getRecipe, Recipe, RecipePayloadItem, updateRecipe } from "@/lib/recipe-api";
-
-function splitToItems(value: string): RecipePayloadItem[] {
-  return value
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => ({ text: line }));
-}
-
-function itemsToText(items: RecipePayloadItem[]) {
-  return items.map((item) => String(item.text ?? item.value ?? item.label ?? "")).join("\n");
-}
+import { useParams, useRouter } from "next/navigation";
+import { RecipeForm } from "@/components/recipe-form";
+import { StatusBanner } from "@/components/status-banner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getCurrentUserIdFromToken, getRecipe, Recipe, updateRecipe } from "@/lib/recipe-api";
+import {
+  EMPTY_RECIPE_FORM_VALUES,
+  joinTextItems,
+  RecipeFormValues,
+  splitTextItems,
+  tagsFromText,
+} from "@/lib/recipe-form";
 
 export default function EditRecipePage() {
   const params = useParams<{ id: string }>();
@@ -24,15 +26,7 @@ export default function EditRecipePage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [ingredients, setIngredients] = useState("");
-  const [steps, setSteps] = useState("");
-  const [prepTime, setPrepTime] = useState("");
-  const [cookTime, setCookTime] = useState("");
-  const [servings, setServings] = useState("");
-  const [category, setCategory] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
+  const [values, setValues] = useState<RecipeFormValues>(EMPTY_RECIPE_FORM_VALUES);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -45,15 +39,18 @@ export default function EditRecipePage() {
         }
 
         setRecipe(data);
-        setTitle(data.title);
-        setDescription(data.description || "");
-        setIngredients(itemsToText(data.ingredients));
-        setSteps(itemsToText(data.steps));
-        setPrepTime(data.prep_time_min ? String(data.prep_time_min) : "");
-        setCookTime(data.cook_time_min ? String(data.cook_time_min) : "");
-        setServings(data.servings ? String(data.servings) : "");
-        setCategory(data.category || "");
-        setIsPublic(data.is_public);
+        setValues({
+          title: data.title,
+          description: data.description || "",
+          ingredients: joinTextItems(data.ingredients),
+          steps: joinTextItems(data.steps),
+          prepTime: data.prep_time_min ? String(data.prep_time_min) : "",
+          cookTime: data.cook_time_min ? String(data.cook_time_min) : "",
+          servings: data.servings ? String(data.servings) : "",
+          category: data.category || "",
+          tags: data.tags.join(", "),
+          isPublic: data.is_public,
+        });
       } catch (error) {
         setMessage((error as Error).message);
       } finally {
@@ -64,6 +61,13 @@ export default function EditRecipePage() {
     void load();
   }, [recipeId, ownerId, router]);
 
+  const updateField = (field: keyof RecipeFormValues, value: string | boolean) => {
+    setValues((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!recipe) {
@@ -72,9 +76,10 @@ export default function EditRecipePage() {
     setSubmitting(true);
     setMessage("");
 
-    const nextIngredients = splitToItems(ingredients);
-    const nextSteps = splitToItems(steps);
-    if (!title.trim()) {
+    const nextIngredients = splitTextItems(values.ingredients);
+    const nextSteps = splitTextItems(values.steps);
+
+    if (!values.title.trim()) {
       setMessage("제목은 비어 있을 수 없습니다.");
       setSubmitting(false);
       return;
@@ -87,15 +92,16 @@ export default function EditRecipePage() {
 
     try {
       await updateRecipe(recipe.id, {
-        title: title.trim(),
-        description,
+        title: values.title.trim(),
+        description: values.description,
         ingredients: nextIngredients,
         steps: nextSteps,
-        prep_time_min: prepTime ? Number(prepTime) : undefined,
-        cook_time_min: cookTime ? Number(cookTime) : undefined,
-        servings: servings ? Number(servings) : undefined,
-        category: category || undefined,
-        is_public: isPublic,
+        prep_time_min: values.prepTime ? Number(values.prepTime) : undefined,
+        cook_time_min: values.cookTime ? Number(values.cookTime) : undefined,
+        servings: values.servings ? Number(values.servings) : undefined,
+        category: values.category || undefined,
+        tags: tagsFromText(values.tags),
+        is_public: values.isPublic,
       });
       router.push(`/recipes/${recipe.id}`);
     } catch (error) {
@@ -106,62 +112,70 @@ export default function EditRecipePage() {
   };
 
   if (loading) {
-    return <p>로딩 중...</p>;
+    return (
+      <section className="space-y-6">
+        <div className="space-y-3">
+          <Skeleton className="h-6 w-24 rounded-full" />
+          <Skeleton className="h-10 w-64" />
+          <Skeleton className="h-5 w-full max-w-2xl" />
+        </div>
+        <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+          <Skeleton className="h-[720px] rounded-[28px]" />
+          <Skeleton className="h-[720px] rounded-[28px]" />
+        </div>
+      </section>
+    );
   }
 
   if (!recipe) {
-    return <p>{message || "수정할 레시피를 찾을 수 없습니다."}</p>;
+    return (
+      <section className="space-y-4">
+        <StatusBanner message={message || "수정할 레시피를 찾을 수 없습니다."} tone="error" />
+        <Button asChild variant="outline">
+          <Link href="/recipes">목록으로 돌아가기</Link>
+        </Button>
+      </section>
+    );
   }
 
   return (
-    <section>
-      <h1>레시피 수정</h1>
-      <form className="card toolbar" onSubmit={onSubmit}>
-        <label>
-          제목 *
-          <input value={title} onChange={(event) => setTitle(event.target.value)} required />
-        </label>
-        <label>
-          설명
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
-        </label>
-        <label>
-          카테고리
-          <input value={category} onChange={(event) => setCategory(event.target.value)} />
-        </label>
-        <label>
-          재료 (한 줄씩 입력)
-          <textarea rows={8} value={ingredients} onChange={(event) => setIngredients(event.target.value)} />
-        </label>
-        <label>
-          조리 단계 (한 줄씩 입력)
-          <textarea rows={8} value={steps} onChange={(event) => setSteps(event.target.value)} />
-        </label>
-        <label>
-          준비 시간(분)
-          <input type="number" value={prepTime} onChange={(event) => setPrepTime(event.target.value)} />
-        </label>
-        <label>
-          조리 시간(분)
-          <input type="number" value={cookTime} onChange={(event) => setCookTime(event.target.value)} />
-        </label>
-        <label>
-          인분
-          <input type="number" value={servings} onChange={(event) => setServings(event.target.value)} />
-        </label>
-        <label>
-          공개 설정
-          <input
-            type="checkbox"
-            checked={isPublic}
-            onChange={(event) => setIsPublic(event.target.checked)}
-          />
-        </label>
-        <button type="submit" disabled={submitting}>
-          {submitting ? "저장 중" : "저장"}
-        </button>
-      </form>
-      {message && <p style={{ color: "crimson" }}>{message}</p>}
+    <section className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-3">
+          <Badge variant="secondary" className="w-fit rounded-full px-3">
+            Edit
+          </Badge>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">레시피 수정</h1>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground sm:text-base">
+              기존 레시피 구조를 다듬고, 공개 여부와 태그까지 한 번에 업데이트합니다.
+            </p>
+          </div>
+        </div>
+        <Button asChild variant="outline">
+          <Link href={`/recipes/${recipe.id}`}>상세 페이지로 돌아가기</Link>
+        </Button>
+      </div>
+
+      <Card className="border-white/70 bg-white/82 shadow-lg shadow-orange-950/5 backdrop-blur">
+        <CardContent className="px-6 py-5">
+          <p className="text-sm leading-6 text-muted-foreground">
+            현재 편집 중인 레시피:
+            <span className="ml-2 font-medium text-foreground">{recipe.title}</span>
+          </p>
+        </CardContent>
+      </Card>
+
+      <RecipeForm
+        heading={`"${recipe.title}" 수정`}
+        description="텍스트와 메타데이터를 정리한 뒤 저장하면 상세 페이지에서 바로 결과를 확인할 수 있습니다."
+        submitLabel="변경 저장"
+        loading={submitting}
+        message={message}
+        values={values}
+        onSubmit={onSubmit}
+        onChange={updateField}
+      />
     </section>
   );
 }

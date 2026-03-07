@@ -1,0 +1,7 @@
+declare module "jquery" {
+  const jquery: any;
+  export default jquery;
+}
+
+declare module "bootstrap/dist/js/bootstrap.bundle.min.js";
+declare module "admin-lte/dist/js/adminlte.min.js";
